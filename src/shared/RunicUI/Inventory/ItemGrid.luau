@@ -21,7 +21,7 @@ local function ItemGrid()
 		children["slot_" .. tostring(i)] = React.createElement(ItemSlot, {
 			icon = UIData.Images.slot,
 			RarityColor = Color3.fromHex("#cbccd4"),
-			OnClicked = function()
+			onClicked = function()
 				print("Clicked slot number: " .. i)
 			end,
 		})
