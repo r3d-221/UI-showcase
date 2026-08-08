@@ -12,7 +12,9 @@ local Utils = require(ReplicatedStorage.Shared.RunicUI.Utils)
 
 local function Main()
 	local children = {
-		constraint = React.createElement("UIAspectRatioConstraint"),
+		constraint = React.createElement("UIAspectRatioConstraint", {
+			AspectRatio = 960 / 645,
+		}),
 		search = React.createElement(Search),
 		grid = React.createElement(Grid),
 		info = React.createElement(ItemInfo),
