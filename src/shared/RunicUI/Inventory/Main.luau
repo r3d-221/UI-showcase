@@ -12,6 +12,7 @@ local Utils = require(ReplicatedStorage.Shared.RunicUI.Utils)
 
 local function Main()
 	local children = {
+		constraint = React.createElement("UIAspectRatioConstraint"),
 		search = React.createElement(Search),
 		grid = React.createElement(Grid),
 		info = React.createElement(ItemInfo),
@@ -30,8 +31,8 @@ local function Main()
 	}
 
 	return React.createElement("Frame", {
-		Size = UDim2.fromScale(0.5, 0.55),
-		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(960, 645),
+		Position = UDim2.fromOffset(479, 216),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundTransparency = 1,
 	}, children)

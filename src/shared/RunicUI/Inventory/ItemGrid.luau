@@ -7,13 +7,12 @@ local UIData = require(ReplicatedStorage.Shared.RunicUI.UIData)
 local function ItemGrid()
 	local children = {
 		grid = React.createElement("UIGridLayout", {
-			CellSize = UDim2.fromScale(0.14, 0.15),
-			CellPadding = UDim2.fromScale(0.025, 0.025),
+			CellSize = UDim2.fromOffset(65, 65),
+			CellPadding = UDim2.fromOffset(10, 13),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 		padding = React.createElement("UIPadding", {
-			PaddingLeft = UDim.new(0.05, 0),
-			PaddingRight = UDim.new(0.015, 0),
+			PaddingLeft = UDim.new(0, 10),
 		}),
 	}
 
@@ -28,7 +27,7 @@ local function ItemGrid()
 	end
 
 	return React.createElement("ScrollingFrame", {
-		Size = UDim2.fromScale(1, 0.94),
+		Size = UDim2.fromScale(0.92, 0.92),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		CanvasSize = UDim2.fromScale(0, 0),

@@ -19,17 +19,18 @@ local function Search()
 			image = UIData.Images.search,
 			imageColor = UIData.Colors.white,
 			zIndex = 0,
-			scale = Enum.ScaleType.Fit,
+			scale = Enum.ScaleType.Stretch,
 		}),
 
 		text = Text({
 			text = "Search..",
 			textSizeX = 0.6,
 			textSizeY = 0.6,
-			textPosX = 0.16,
+			textPosX = 0.385,
 			textPosY = 0.5,
 			transparency = 0.6,
 			textColor = UIData.Colors.background,
+			alignment = Enum.TextXAlignment.Left,
 		}),
 	}
 

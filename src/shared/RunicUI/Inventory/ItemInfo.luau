@@ -6,19 +6,7 @@ local UIData = require(ReplicatedStorage.Shared.RunicUI.UIData)
 
 local function ItemInfo()
 	local children = {
-		title = React.createElement(Title, {
-			textSizeX = 0.6,
-			textSizeY = 0.6,
-			frameSizeX = 0.9,
-			frameSizeY = 0.1,
-			framePosX = 0.5,
-			framePosY = 0.06,
-			text = "Leather armor",
-			backgroundImage = UIData.Images.title,
-			frameColor = UIData.Colors.common,
-			textColor = UIData.Colors.white,
-			imageScale = Enum.ScaleType.Fit,
-		}),
+		title = React.createElement(Title),
 	}
 
 	return React.createElement("Frame", {
