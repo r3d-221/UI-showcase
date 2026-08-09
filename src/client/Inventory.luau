@@ -15,6 +15,10 @@ local slotTemplate = ReplicatedStorage.templates.slot_template
 
 type Item = Types.Item
 
+type Tab = "weapons" | "armors" | "materials"
+
+local currentTab: Tab = "weapons"
+
 local Inventory = {}
 local map = Util.mapUI(screen)
 
@@ -37,13 +41,16 @@ function Inventory.clearSlots()
 	end
 end
 
-function Inventory.updateSlots(data: Item)
+function Inventory.updateSlots(data: { Item })
 	Inventory.clearSlots()
 
 	-- re populate the list with the new data
+	for _, item in data do
+		Inventory.createSlot(item)
+	end
 end
 
-function Inventory.createSlot()
+function Inventory.createSlot(item: Item)
 	local new = slotTemplate:Clone()
 
 	new.Parent = map.list

@@ -1,20 +1,34 @@
 --!strict
 local Types = {}
 
-export type WeaponsStats = {
-	luck: number?,
-	damage: number,
-	critRate: number,
-	critDamage: number,
-	attackSpeed: number?,
-	cooldownReduction: number?,
+export type Roll = {
+	value: number,
+	rank: string,
 }
 
-export type ArmorStats = {
-	armor: number,
-	health: number,
-	luck: number?,
-	speed: number?,
+export type WeaponStatNames = {
+	luck: string,
+	damage: string,
+	critRate: string,
+	critDamage: string,
+	attackSpeed: string,
+	cooldownReduction: string,
+}
+
+export type ArmorStatNames = {
+	armor: string,
+	health: string,
+	luck: string,
+	speed: string,
+}
+
+export type RarityNames = {
+	common: string,
+	rare: string,
+	epic: string,
+	legendary: string,
+	mythic: string,
+	secret: string,
 }
 
 export type Weapon = {
@@ -39,6 +53,19 @@ export type Material = {
 	amount: number,
 }
 
+export type WeaponData = {
+	name: string,
+	rarity: Rarity,
+	baseStats: { [WeaponStatNames]: number },
+	passives: {},
+	description: string,
+	abilities: string,
+}
+
+export type Rarity = { [RarityNames]: number }
+export type WeaponsList = { [string]: WeaponData }
+export type WeaponsStats = { [WeaponStatNames]: Roll }
+export type ArmorStats = { [ArmorStatNames]: Roll }
 export type Stats = WeaponsStats | ArmorStats
 export type Item = Weapon | Armor | Material
 
