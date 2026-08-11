@@ -6,37 +6,16 @@ export type Roll = {
 	rank: string,
 }
 
-export type WeaponStatNames = {
-	luck: string,
-	damage: string,
-	critRate: string,
-	critDamage: string,
-	attackSpeed: string,
-	cooldownReduction: string,
-}
-
-export type ArmorStatNames = {
-	armor: string,
-	health: string,
-	luck: string,
-	speed: string,
-}
-
-export type RarityNames = {
-	common: string,
-	rare: string,
-	epic: string,
-	legendary: string,
-	mythic: string,
-	secret: string,
-}
+export type WeaponStatName = "damage" | "critRate" | "critDamage" | "luck" | "attackSpeed" | "cooldownReduction"
+export type ArmorStatName = "armor" | "health" | "luck" | "speed"
+export type RarityName = "common" | "rare" | "epic" | "legendary" | "mythic" | "secret"
 
 export type Weapon = {
 	id: string,
 	uid: string,
 	level: number,
 	locked: boolean,
-	stats: WeaponsStats,
+	stats: WeaponStats,
 }
 
 export type Armor = {
@@ -53,20 +32,21 @@ export type Material = {
 	amount: number,
 }
 
-export type WeaponData = {
+export type WeaponInfo = {
 	name: string,
-	rarity: Rarity,
-	baseStats: { [WeaponStatNames]: number },
+	rarity: RarityName,
+	baseStats: { [WeaponStatName]: number },
 	passives: {},
+	abilities: {},
 	description: string,
-	abilities: string,
 }
 
-export type Rarity = { [RarityNames]: number }
-export type WeaponsList = { [string]: WeaponData }
-export type WeaponsStats = { [WeaponStatNames]: Roll }
-export type ArmorStats = { [ArmorStatNames]: Roll }
-export type Stats = WeaponsStats | ArmorStats
+export type StatsList = { Stat }
+export type Stat = WeaponStats | ArmorStats
 export type Item = Weapon | Armor | Material
+export type Rarity = { [RarityName]: number }
+export type WeaponData = { [string]: WeaponInfo }
+export type WeaponStats = { [WeaponStatName]: Roll }
+export type ArmorStats = { [ArmorStatName]: Roll }
 
 return Types

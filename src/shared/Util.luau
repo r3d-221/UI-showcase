@@ -53,10 +53,6 @@ function Util.mapUI(rootElement)
 		["text"] = true,
 		["base"] = true,
 		["icon"] = true,
-		["top_left"] = true,
-		["top_right"] = true,
-		["bottom_left"] = true,
-		["bottom_right"] = true,
 	}
 
 	for _, child in rootElement:GetDescendants() do
