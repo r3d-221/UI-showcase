@@ -9,6 +9,15 @@
       },
       "Packages": {
         "$path": "Packages"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "SyncData": {
+          "$className": "RemoteEvent"
+        },
+        "Getitem": {
+          "$className": "RemoteEvent"
+        }
       }
     },
 

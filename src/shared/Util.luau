@@ -32,11 +32,11 @@ function Util.weightedRandom(weightPool: { [any]: number }): any
 	local roll = math.random() * totalWeight
 	local cumulative = 0
 
-	-- get item
-	for item, weight in pairs(weightPool) do
-		cumulative += weight
+	-- get key
+	for key, value in pairs(weightPool) do
+		cumulative += value
 		if roll <= cumulative then
-			return item
+			return key
 		end
 	end
 
