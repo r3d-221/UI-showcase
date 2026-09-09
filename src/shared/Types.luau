@@ -41,9 +41,17 @@ export type WeaponInfo = {
 	description: string,
 }
 
+export type Item = {
+	id: string,
+	uid: string?,
+	level: string?,
+	amount: number?,
+	locked: boolean?,
+	stats: { Stat }?,
+}
+
 export type StatsList = { Stat }
 export type Stat = WeaponStats | ArmorStats
-export type Item = Weapon | Armor | Material
 export type Rarity = { [RarityName]: number }
 export type WeaponData = { [string]: WeaponInfo }
 export type WeaponStats = { [WeaponStatName]: Roll }
