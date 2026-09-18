@@ -1,11 +1,17 @@
-local HttpService = game:GetService("HttpService")
-local PlayerDataService = game:GetService("PlayerDataService")
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local ServerScriptService = game:GetService("ServerScriptService")
 
+local PlayerService = require(ServerScriptService.Server.PlayerService)
 local ItemData = require(ReplicatedStorage.Shared.ItemData)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Util = require(ReplicatedStorage.Shared.Util)
+
 local ItemService = {}
+
+local GENERATOR_TAG = "Generator"
+local PROMPT_NAME = "prompt"
 
 type Stat = Types.Stat
 type Item = Types.Item
@@ -73,11 +79,29 @@ local function createItem(id: string, category: string, num: number?): Item
 	return item
 end
 
-function ItemService.addItem(player: Player, id: string, category: string, amount: number?)
+local function addItem(player: Player, id: string, category: string, amount: number?)
 	local item = createItem(id, category, amount)
-	PlayerDataService.addItem(player, item, category)
+	PlayerService.addItem(player, item, category)
 end
 
-function ItemService.onStart() end
+local function onTriggered()
+	for _, object in CollectionService:GetTagged(GENERATOR_TAG) do
+		local prompt: ProximityPrompt = object:FindFirstChild(PROMPT_NAME)
+
+		local id: StringValue = object:FindFirstChild("id")
+		local category = "weapons" -- FORCE CODE
+
+		local itemData = ItemData[category][id.Value]
+
+		prompt.Triggered:Connect(function(player: Player)
+			addItem(player, id.Value, category)
+			print("[ItemService] " .. player.Name .. " has obtained " .. itemData.name)
+		end)
+	end
+end
+
+function ItemService.onStart()
+	onTriggered()
+end
 
 return ItemService

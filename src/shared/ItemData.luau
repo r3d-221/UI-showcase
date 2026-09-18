@@ -11,6 +11,10 @@ type ItemsList = {
 	weapons: { WeaponData },
 	rarity: Rarity,
 	itemFrames: { [RarityName]: string },
+	rarityColors: {},
+	statNames: {},
+	statOrder: { string },
+	statTypes: { [string]: string },
 }
 
 local ItemData: ItemsList = {
@@ -47,6 +51,15 @@ local ItemData: ItemsList = {
 		mythic = 0.01,
 	},
 
+	rarityColors = {
+		common = Color3.fromHex("CBD5E0"),
+		rare = Color3.fromHex("3182CE"),
+		epic = Color3.fromHex("805AD5"),
+		legendary = Color3.fromHex("D7DD20"),
+		mythic = Color3.fromHex("F59326"),
+		secret = Color3.fromHex("222324"),
+	},
+
 	itemFrames = {
 		common = "rbxassetid://126419482158052",
 		rare = "rbxassetid://111734335113787",
@@ -54,6 +67,23 @@ local ItemData: ItemsList = {
 		legendary = "rbxassetid://108079644167723",
 		mythic = "rbxassetid://75615909782162",
 		secret = "rbxassetid://113901076644858",
+	},
+	statNames = {
+		damage = "Damage",
+		critRate = "Crit rate",
+		critDamage = "Crit Damage",
+	},
+
+	statOrder = {
+		"damage",
+		"critRate",
+		"critDamage",
+	},
+
+	statTypes = {
+		damage = "flat",
+		critRate = "percent",
+		critDamage = "percent",
 	},
 }
 

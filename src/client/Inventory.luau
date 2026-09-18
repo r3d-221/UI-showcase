@@ -7,10 +7,13 @@ local PlayerScripts = player:WaitForChild("PlayerScripts")
 
 local screen = PlayerGui:WaitForChild("Screens")
 
+local Client = PlayerScripts.Client
+
+local PlayerManager = require(Client.PlayerManager)
+local UIManager = require(Client.UIManager)
 local ItemData = require(ReplicatedStorage.Shared.ItemData)
 local Types = require(ReplicatedStorage.Shared.Types)
 local Util = require(ReplicatedStorage.Shared.Util)
-local UIManager = require(PlayerScripts.Client.UIManager)
 
 local slotTemplate = ReplicatedStorage.templates.slot_template
 local statTemplate = ReplicatedStorage.templates.stat_template
@@ -83,7 +86,7 @@ function createSlot(item: Item, parent: Instance?)
 	new.Name = "slot"
 
 	local frame = new:FindFirstChild("background")
-	frame.Image = ItemData[itemData.rarity]
+	frame.Image = ItemData.itemFrames[itemData.rarity]
 
 	local selectedFrame = new:FindFirstChild("selected")
 	selectedFrame.Visible = false
@@ -106,7 +109,7 @@ function createSlot(item: Item, parent: Instance?)
 	end)
 end
 
-function createStat(name: string, roll: Types.Roll)
+function createStat(name: string, rank: string, displayValue: string)
 	local new = statTemplate:Clone()
 
 	new.Parent = map.stats_info
@@ -116,12 +119,12 @@ function createStat(name: string, roll: Types.Roll)
 	local statRank = new:FindFirstChild("stat_rank")
 	local statName = new:FindFirstChild("stat_name")
 
-	statAmount.Text = roll.value
-	statRank.Text = roll.rank
+	statAmount.Text = displayValue
+	statRank.Text = rank
 	statName.Text = name .. ":"
 end
 
-function toggleInfo(bool: boolean)
+function Inventory.toggleInfo(bool: boolean)
 	for _, child in map.info:GetChildren() do
 		child.Visible = bool
 	end
@@ -136,8 +139,22 @@ function toggleInfo(bool: boolean)
 end
 
 function Inventory.onStart()
-	print(map)
 	setUpButtons()
+
+	PlayerManager.onChange(function(data)
+		Inventory.updateSlots(data.items)
+	end)
+
+	local data = PlayerManager.getData()
+	if data then
+		Inventory.updateSlots(data.items)
+	end
+end
+
+function Inventory.closeInfo()
+	for _, child in map.info:GetChildren() do
+		child.Visible = false
+	end
 end
 
 function Inventory.clearSlots()
@@ -171,10 +188,10 @@ function Inventory.closeItemInfo()
 	end
 end
 
-function Inventory.updateSlots(data: { Item })
+function Inventory.updateSlots(data)
 	Inventory.clearSlots()
 
-	for _, item in data do
+	for _, item in data[currentTab] do
 		createSlot(item)
 	end
 end
@@ -187,11 +204,23 @@ function Inventory.updateStats()
 
 	Inventory.clearStats()
 
-	local item = currentItem :: Types.Weapon | Types.Armor
+	local item = currentItem
 	local stats = item.stats
 
-	for stat, roll in pairs(stats) do
-		createStat(stat, roll)
+	for _, statKey in ipairs(ItemData.statOrder) do
+		local roll = stats[statKey]
+
+		if roll then
+			local displayValue
+
+			if ItemData.statTypes[statKey] == "percent" then
+				displayValue = string.format("%.1f%%", roll.value * 100)
+			else
+				displayValue = tostring(math.round(roll.value))
+			end
+
+			createStat(ItemData.statNames[statKey], roll.rank, displayValue)
+		end
 	end
 end
 
@@ -208,7 +237,7 @@ function Inventory.updateInfo()
 		return
 	end
 
-	toggleInfo(false)
+	Inventory.toggleInfo(false)
 	createSlot(item, map.item)
 
 	local slot = map.item:FindFirstChild("slot")
@@ -238,7 +267,7 @@ function Inventory.updateInfo()
 	local title = map.title
 	title.Visible = true
 	title.text.Text = itemData.name
-	title.background.ImageColor3 = itemData.rarityColors[itemData.rarity]
+	title.background.ImageColor3 = ItemData.rarityColors[itemData.rarity]
 
 	if not hasStats then
 		switchInfoTab("description")

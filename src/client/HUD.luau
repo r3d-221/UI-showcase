@@ -6,6 +6,10 @@ local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 local PlayerScripts = player:WaitForChild("PlayerScripts")
 
+local Client = PlayerScripts.Client
+
+local PlayerManager = require(Client.PlayerManager)
+
 local screen = PlayerGui:WaitForChild("HUD")
 
 local Inventory = require(StarterPlayer.StarterPlayerScripts.Client.Inventory)
@@ -43,6 +47,13 @@ local function setUpButtons()
 			UIManager.closeAll()
 			UIManager.openExclusive("inventory")
 			currentButton = "inventory"
+			Inventory.closeInfo()
+
+			local data = PlayerManager.getData()
+			if data then
+				Inventory.updateSlots(data.items)
+			end
+
 			setActive()
 		else
 			currentButton = nil
