@@ -32,6 +32,17 @@ local currentSlotUI: Frame? = nil
 local Inventory = {}
 local map = Util.mapUI(screen)
 
+function update()
+	PlayerManager.onChange(function(data)
+		Inventory.updateSlots(data.items)
+	end)
+
+	local data = PlayerManager.getData()
+	if data then
+		Inventory.updateSlots(data.items)
+	end
+end
+
 local function switchInfoTab(tabName: InfoTab)
 	map.stats_info.Visible = (tabName == "stats")
 	map.passives_info.Visible = (tabName == "passives")
@@ -46,12 +57,41 @@ local function switchInfoTab(tabName: InfoTab)
 	end
 end
 
+local function switchTab()
+	map.weapons.selected.Visible = false
+	map.armors.selected.Visible = false
+	map.materials.selected.Visible = false
+
+	map[currentTab].selected.Visible = true
+end
+
 local function setUpButtons()
 	map.close.button.MouseButton1Click:Connect(function()
 		UIManager.closeAll()
 		Inventory.clearSlots()
 		Inventory.clearStats()
-		Inventory.closeItemInfo()
+		Inventory.closeInfo()
+	end)
+
+	map.weapons.button.MouseButton1Click:Connect(function()
+		currentTab = "weapons"
+		Inventory.closeInfo()
+		switchTab()
+		update()
+	end)
+
+	map.armors.button.MouseButton1Click:Connect(function()
+		currentTab = "armors"
+		Inventory.closeInfo()
+		switchTab()
+		update()
+	end)
+
+	map.materials.button.MouseButton1Click:Connect(function()
+		currentTab = "materials"
+		Inventory.closeInfo()
+		switchTab()
+		update()
 	end)
 
 	map.stats.button.MouseButton1Click:Connect(function()
@@ -141,20 +181,7 @@ end
 function Inventory.onStart()
 	setUpButtons()
 
-	PlayerManager.onChange(function(data)
-		Inventory.updateSlots(data.items)
-	end)
-
-	local data = PlayerManager.getData()
-	if data then
-		Inventory.updateSlots(data.items)
-	end
-end
-
-function Inventory.closeInfo()
-	for _, child in map.info:GetChildren() do
-		child.Visible = false
-	end
+	update()
 end
 
 function Inventory.clearSlots()
@@ -172,6 +199,14 @@ function Inventory.clearStats()
 			child:Destroy()
 		end
 	end
+end
+
+function Inventory.closeInfo()
+	for _, child in map.info:GetChildren() do
+		child.Visible = false
+	end
+
+	Inventory.closeItemInfo()
 end
 
 function Inventory.closeItemInfo()
