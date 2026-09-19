@@ -1,72 +1,110 @@
+--!strict
+
+-- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StarterPlayer = game:GetService("StarterPlayer")
 
+-- Dependencies
 local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 local PlayerScripts = player:WaitForChild("PlayerScripts")
 
 local Client = PlayerScripts.Client
-
 local PlayerManager = require(Client.PlayerManager)
+local UIManager = require(Client.UIManager)
+local AnimationManager = require(Client.AnimationManager)
+local Inventory = require(Client.Inventory)
 
-local screen = PlayerGui:WaitForChild("HUD")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Util)
 
-local Inventory = require(StarterPlayer.StarterPlayerScripts.Client.Inventory)
-local Util = require(ReplicatedStorage.Shared.Util)
-local UIManager = require(PlayerScripts.Client.UIManager)
+-- Constants
+local COLOR_PASSIVE = Color3.fromHex("748182")
+local COLOR_ACTIVE = Color3.fromHex("00F0FF")
 
+-- Types
+type HUDButton = "inventory"
+
+-----------------------------------
+-- Module definition & state
+-----------------------------------
 local HUD = {}
-local map = Util.mapUI(screen)
 
-type buttons = "inventory" | nil
+local HUDScreen = PlayerGui:WaitForChild("HUD")
+local Screens = PlayerGui:WaitForChild("Screens")
+local map = Util.mapUI(HUDScreen)
+print(map)
 
-local currentButton: buttons = nil
+local currentButton: HUDButton? = nil
 
-local function setActive()
-	local passive = Color3.fromHex("748182")
-	local active = Color3.fromHex("00F0FF")
+-----------------------------------
+-- Helper functions
+-----------------------------------
 
-	if currentButton == nil then
-		map.inventory.icon.ImageColor3 = passive
-		-- add the rest of the buttons
-		return
-	end
-
-	if currentButton == "inventory" then
-		map.inventory.icon.ImageColor3 = active
-	else
-		map.inventory.icon.ImageColor3 = passive
+local function updateButtonColors()
+	if map.inventory and map.inventory:FindFirstChild("icon") then
+		local icon = map.inventory.icon :: ImageLabel
+		icon.ImageColor3 = (currentButton == "inventory") and COLOR_ACTIVE or COLOR_PASSIVE
 	end
 end
 
 local function setUpButtons()
-	map.inventory.button.MouseButton1Click:Connect(function()
-		local isOpen = UIManager.toggle("inventory")
-		if isOpen then
+	local inventoryButton = map.inventory.button
+	local inventory = Screens:FindFirstChild("inventory")
+	local canvas = inventory:FindFirstChild("canvas")
+
+	Inventory.ScreenClosed:Connect(function()
+		currentButton = nil
+		updateButtonColors()
+	end)
+
+	inventoryButton.MouseEnter:Connect(function()
+		AnimationManager.hover(map.inventory, true)
+	end)
+
+	inventoryButton.MouseLeave:Connect(function()
+		AnimationManager.hover(map.inventory, false)
+	end)
+
+	inventoryButton.MouseButton1Click:Connect(function()
+		AnimationManager.popOut(map.inventory)
+
+		local wasOpen = (currentButton == "inventory")
+
+		if not wasOpen then
 			UIManager.closeAll()
-			UIManager.openExclusive("inventory")
+
+			AnimationManager.windowOpen(inventory, canvas)
+			Inventory.playSectionFades()
 			currentButton = "inventory"
+
 			Inventory.closeInfo()
 
 			local data = PlayerManager.getData()
-			if data then
+			if data and data.items then
 				Inventory.updateSlots(data.items)
 			end
-
-			setActive()
 		else
+			UIManager.closeAll()
 			currentButton = nil
-			setActive()
+
+			AnimationManager.windowClose(inventory, canvas)
+
 			Inventory.clearSlots()
 			Inventory.clearStats()
 			Inventory.closeInfo()
 		end
+
+		updateButtonColors()
 	end)
 end
 
+-----------------------------------
+-- Public functions
+-----------------------------------
+
 function HUD.onStart()
-	setActive()
+	updateButtonColors()
 	setUpButtons()
 end
 

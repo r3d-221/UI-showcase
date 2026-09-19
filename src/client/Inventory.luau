@@ -12,11 +12,13 @@ local PlayerScripts = player:WaitForChild("PlayerScripts")
 local Client = PlayerScripts:WaitForChild("Client")
 local PlayerManager = require(Client.PlayerManager)
 local UIManager = require(Client.UIManager)
+local AnimationManager = require(Client.AnimationManager)
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local ItemData = require(Shared.ItemData)
 local Types = require(Shared.Types)
 local Util = require(Shared.Util)
+local Signal = require(Shared.Signal)
 
 -- Templates
 local templates = ReplicatedStorage:WaitForChild("templates")
@@ -36,9 +38,14 @@ local INFO_TAB_KEYS: { InfoTab } = { "stats", "passives", "description" }
 -- Module definition & state
 -----------------------------------
 local Inventory = {}
+Inventory.ScreenClosed = Signal.new()
 
 local screen = PlayerGui:WaitForChild("Screens")
-local map = Util.mapUI(screen)
+local inventory = screen:FindFirstChild("inventory")
+local canvas = inventory:FindFirstChild("canvas")
+local map = Util.mapUI(canvas)
+
+print(map)
 
 local currentTab: Tab = "weapons"
 local currentItem: Item? = nil
@@ -63,6 +70,7 @@ local function setSelectedSlot(newSlot: Frame?)
 		local new = currentSlotUI:FindFirstChild("selected") :: ImageLabel?
 		if new then
 			new.Visible = true
+			AnimationManager.popOut(new)
 		end
 	end
 end
@@ -145,7 +153,15 @@ local function createSlot(item: Item, parent: Instance?): Frame?
 
 	local button = slot:FindFirstChild("button") :: TextButton?
 	if button then
+		button.MouseEnter:Connect(function()
+			AnimationManager.hover(slot, true)
+		end)
+		button.MouseLeave:Connect(function()
+			AnimationManager.hover(slot, false)
+		end)
+
 		button.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(slot)
 			setSelectedSlot(slot)
 			currentItem = item
 			Inventory.updateInfo()
@@ -157,17 +173,39 @@ local function createSlot(item: Item, parent: Instance?): Frame?
 end
 
 local function setUpButtons()
-	map.close.button.MouseButton1Click:Connect(function()
+	local closeButton = map.close:FindFirstChild("button") :: TextButton
+
+	closeButton.MouseEnter:Connect(function()
+		AnimationManager.hover(map.close, true)
+	end)
+	closeButton.MouseLeave:Connect(function()
+		AnimationManager.hover(map.close, false)
+	end)
+	closeButton.MouseButton1Click:Connect(function()
+		AnimationManager.popOut(map.close)
+
+		AnimationManager.windowClose(inventory, canvas)
+
 		UIManager.closeAll()
 		Inventory.clearSlots()
 		Inventory.clearStats()
 		Inventory.closeInfo()
+
+		Inventory.ScreenClosed:Fire()
 	end)
 
 	for _, name in TAB_KEYS do
 		local tab = map[name]
 		if tab and tab:FindFirstChild("button") then
-			tab.button.MouseButton1Click:Connect(function()
+			local button = tab.button
+			button.MouseEnter:Connect(function()
+				AnimationManager.hover(tab, true)
+			end)
+			button.MouseLeave:Connect(function()
+				AnimationManager.hover(tab, false)
+			end)
+			button.MouseButton1Click:Connect(function()
+				AnimationManager.popOut(tab)
 				switchTab(name :: Tab)
 			end)
 		end
@@ -176,11 +214,18 @@ local function setUpButtons()
 	for _, name in INFO_TAB_KEYS do
 		local info = map[name]
 		if info and info:FindFirstChild("button") then
-			info.button.MouseButton1Click:Connect(function()
+			local button = info.button
+			button.MouseEnter:Connect(function()
+				AnimationManager.hover(info, true)
+			end)
+			button.MouseLeave:Connect(function()
+				AnimationManager.hover(info, false)
+			end)
+			button.MouseButton1Click:Connect(function()
 				if name ~= "description" and currentTab == "materials" then
-					-- not set up
 					return
 				end
+				AnimationManager.popOut(info)
 				switchInfoTab(name :: InfoTab)
 			end)
 		end
@@ -195,6 +240,7 @@ function Inventory.clearSlots()
 	setSelectedSlot(nil)
 	for _, child in map.list:GetChildren() do
 		if child:IsA("Frame") then
+			AnimationManager.cancel(child)
 			child:Destroy()
 		end
 	end
@@ -209,8 +255,12 @@ function Inventory.clearStats()
 end
 
 function Inventory.toggleInfo(isVisible: boolean)
-	for _, child in map.info:GetChildren() do
-		child.Visible = isVisible
+	if map.info:IsA("CanvasGroup") then
+		AnimationManager.fade(map.info, isVisible)
+	else
+		for _, child in map.info:GetChildren() do
+			child.Visible = isVisible
+		end
 	end
 
 	if not isVisible then
@@ -231,6 +281,21 @@ function Inventory.closeInfo()
 	end
 end
 
+function Inventory.playSectionFades()
+	local sectionsToFade = {}
+
+	local order = { "search", "filter", "weapons", "armors", "materials", "grid", "info" }
+
+	for _, name in ipairs(order) do
+		local element = map[name]
+		if element and element:IsA("CanvasGroup") then
+			table.insert(sectionsToFade, element)
+		end
+	end
+
+	AnimationManager.staggerSectionsIn(sectionsToFade)
+end
+
 function Inventory.updateSlots(items)
 	Inventory.clearSlots()
 
@@ -239,8 +304,13 @@ function Inventory.updateSlots(items)
 		return
 	end
 
+	local index = 0
 	for _, item in tabItems do
-		createSlot(item)
+		local slot = createSlot(item)
+		if slot then
+			index += 1
+			AnimationManager.staggerPopIn(slot, index)
+		end
 	end
 end
 
@@ -300,11 +370,19 @@ function Inventory.updateInfo()
 		if selected then
 			selected:Destroy()
 		end
+
+		AnimationManager.popOut(slot)
 	end
 
-	map.item.Visible = true
+	if map.item:IsA("CanvasGroup") then
+		AnimationManager.fade(map.item, true)
+	else
+		map.item.Visible = true
+	end
 
 	local hasStats = (currentTab ~= "materials")
+
+	Inventory.toggleInfo(true)
 	map.item_info.Visible = true
 	map.info_tabs.Visible = true
 	map.stats.Visible = hasStats
@@ -313,7 +391,6 @@ function Inventory.updateInfo()
 
 	map.title.Visible = true
 	map.title.text.Text = itemData.name
-	map.title.background.ImageColor3 = ItemData.rarityColors[itemData.rarity]
 
 	switchInfoTab(if hasStats then "stats" else "description")
 end

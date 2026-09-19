@@ -1,22 +1,29 @@
+--!strict
+
+-- Services
+local ServerScriptService = game:GetService("ServerScriptService")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
-local ServerScriptService = game:GetService("ServerScriptService")
 
-local PlayerService = require(ServerScriptService.Server.PlayerService)
-local ItemData = require(ReplicatedStorage.Shared.ItemData)
-local Types = require(ReplicatedStorage.Shared.Types)
-local Util = require(ReplicatedStorage.Shared.Util)
+-- Dependencies
+local Server = ServerScriptService:WaitForChild("Server")
+local PlayerService = require(Server.PlayerService)
 
-local ItemService = {}
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ItemData = require(Shared.ItemData)
+local Types = require(Shared.Types)
+local Util = require(Shared.Util)
 
-local GENERATOR_TAG = "Generator"
-local PROMPT_NAME = "prompt"
-
+-- Types
 type Stats = Types.Stats
 type Item = Types.Item
 
-local ranks = {
+-- Constants
+local GENERATOR_TAG = "Generator"
+local PROMPT_NAME = "prompt"
+
+local RANKS = {
 	SSS = 0.005,
 	SS = 0.015,
 	S = 0.05,
@@ -26,7 +33,7 @@ local ranks = {
 	D = 0.35,
 }
 
-local rankBoost = {
+local RANK_BOOST = {
 	SSS = 0.30,
 	SS = 0.25,
 	S = 0.20,
@@ -36,72 +43,88 @@ local rankBoost = {
 	D = -0.05,
 }
 
-local function rollItem(stats: Stats)
-	for stat, base in stats do
-		local rank = Util.weightedRandom(ranks)
-		local newValue = base
+-----------------------------------
+-- Module definition & state
+-----------------------------------
+local ItemService = {}
 
-		for rankName, multiplier in rankBoost do
-			if rank == rankName then
-				newValue = base + (base * multiplier)
-			end
-		end
+-----------------------------------
+-- Helper functions
+-----------------------------------
 
-		stats[stat] = {
-			value = newValue,
+local function rollStats(stats: Stats)
+	for name, base in stats do
+		local rank = Util.weightedRandom(RANKS)
+
+		local multiplier = RANK_BOOST[rank] or 0
+
+		stats[name] = {
+			value = base + (base * multiplier),
 			rank = rank,
 		}
 	end
 end
 
-local function createItem(id: string, category: string, num: number?): Item
-	local itemData = ItemData[category][id]
-	local item: Item
-	if category ~= "materials" then
-		item = {
-			id = id,
-			uid = HttpService:GenerateGUID(false),
-			level = 1,
-			locked = false,
-			stats = table.clone(itemData.baseStats),
-		}
+local function createItem(id: string, category: string, amount: number?): Item?
+	local categoryData = ItemData[category]
+	local itemData = categoryData and categoryData[id]
 
-		if item.stats then
-			rollItem(item.stats)
-		end
-	else
-		item = {
+	if not itemData then
+		warn(string.format("[ItemService] Invalid item ID '%s' for category '%s'", id, category))
+		return nil
+	end
+
+	if category == "materials" then
+		return {
 			id = id,
-			amount = num,
+			amount = amount or 1,
 		}
+	end
+
+	local item: Item = {
+		id = id,
+		uid = HttpService:GenerateGUID(false),
+		level = 1,
+		locked = false,
+		stats = table.clone(itemData.baseStats),
+	}
+
+	if item.stats then
+		rollStats(item.stats)
 	end
 
 	return item
 end
 
-local function addItem(player: Player, id: string, category: string, amount: number?)
+-----------------------------------
+-- Public functions
+-----------------------------------
+
+function ItemService.giveItem(player: Player, id: string, category: string, amount: number?)
 	local item = createItem(id, category, amount)
-	PlayerService.addItem(player, item, category)
-end
-
-local function onTriggered()
-	for _, object in CollectionService:GetTagged(GENERATOR_TAG) do
-		local prompt: ProximityPrompt = object:FindFirstChild(PROMPT_NAME)
-
-		local id: StringValue = object:FindFirstChild("id")
-		local category = "weapons" -- FORCE CODE
-
-		local itemData = ItemData[category][id.Value]
-
-		prompt.Triggered:Connect(function(player: Player)
-			addItem(player, id.Value, category)
-			print("[ItemService] " .. player.Name .. " has obtained " .. itemData.name)
-		end)
+	if item then
+		PlayerService.addItem(player, item, category)
 	end
 end
 
 function ItemService.onStart()
-	onTriggered()
+	for _, object in CollectionService:GetTagged(GENERATOR_TAG) do
+		local prompt = object:FindFirstChild(PROMPT_NAME) :: ProximityPrompt?
+		local id = object:FindFirstChild("id") :: StringValue?
+
+		local category = object:FindFirstChild("category") :: StringValue?
+
+		if prompt and id and category then
+			prompt.Triggered:Connect(function(player: Player)
+				if category.Value ~= "materials" then
+					ItemService.giveItem(player, id.Value, category.Value)
+					print(string.format("[ItemService] %s obtained %s", player.Name, id.Value))
+				end
+			end)
+		else
+			warn("[ItemService] Generator missing prompt, id, or category: " .. object.Name)
+		end
+	end
 end
 
 return ItemService
