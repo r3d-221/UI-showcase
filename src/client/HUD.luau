@@ -60,7 +60,7 @@ local function setUpButtons()
 			setActive()
 			Inventory.clearSlots()
 			Inventory.clearStats()
-			Inventory.closeItemInfo()
+			Inventory.closeInfo()
 		end
 	end)
 end

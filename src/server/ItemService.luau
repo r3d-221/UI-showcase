@@ -13,7 +13,7 @@ local ItemService = {}
 local GENERATOR_TAG = "Generator"
 local PROMPT_NAME = "prompt"
 
-type Stat = Types.Stat
+type Stats = Types.Stats
 type Item = Types.Item
 
 local ranks = {
@@ -36,7 +36,7 @@ local rankBoost = {
 	D = -0.05,
 }
 
-local function rollItem(stats: { Stat })
+local function rollItem(stats: Stats)
 	for stat, base in stats do
 		local rank = Util.weightedRandom(ranks)
 		local newValue = base

@@ -3,8 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Types = require(ReplicatedStorage.Shared.Types)
 
-type WeaponData = Types.WeaponData
-type Rarity = Types.Rarity
+type WeaponData = Types.WeaponDataMap
+type Rarity = Types.RarityMap
 type RarityName = Types.RarityName
 
 type ItemsList = {
