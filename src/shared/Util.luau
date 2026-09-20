@@ -55,6 +55,7 @@ function Util.mapUI(rootElement)
 		["icon"] = true,
 		["fill"] = true,
 		["fill_tabs"] = true,
+		["scroll"] = true,
 	}
 
 	for _, child in rootElement:GetDescendants() do
@@ -66,6 +67,7 @@ function Util.mapUI(rootElement)
 				or child:IsA("TextLabel")
 				or child:IsA("TextButton")
 				or child:IsA("CanvasGroup")
+				or child:IsA("TextBox")
 			) and not ignoreNames[child.Name]
 		then
 			map[child.Name] = child

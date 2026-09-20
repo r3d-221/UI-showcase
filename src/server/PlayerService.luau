@@ -30,8 +30,6 @@ local function defaultData()
 			armors = {},
 			materials = {},
 		},
-		filter = {},
-		settings = {},
 	}
 end
 

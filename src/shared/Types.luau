@@ -9,6 +9,8 @@ export type Roll = {
 export type WeaponStatName = "damage" | "critRate" | "critDamage" | "luck" | "attackSpeed" | "cooldownReduction"
 export type ArmorStatName = "armor" | "health" | "luck" | "speed"
 export type RarityName = "common" | "rare" | "epic" | "legendary" | "mythic" | "secret"
+export type ItemTags = "sword" | "spear" | "axe" | "greatSword" | "bow" | "crossBow" | "mechanicalBow" | "unique"
+export type ItemTypes = "melee" | "range"
 
 export type WeaponStats = { [WeaponStatName]: Roll }
 export type ArmorStats = { [ArmorStatName]: Roll }
@@ -53,6 +55,9 @@ export type WeaponInfo = {
 	passives: { [string]: any },
 	abilities: { [string]: any },
 	description: string,
+	keywords: { [string]: any },
+	type: ItemTypes,
+	tags: { ItemTags },
 }
 
 export type RarityMap = { [RarityName]: number }

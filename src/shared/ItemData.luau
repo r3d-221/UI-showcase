@@ -22,6 +22,8 @@ local ItemData: ItemsList = {
 		ironSword = {
 			name = "Iron Sword",
 			rarity = "common",
+			type = "melee",
+			tags = { "sword" },
 			baseStats = {
 				damage = 10,
 				critRate = 0,
@@ -30,10 +32,13 @@ local ItemData: ItemsList = {
 			passives = {},
 			abilities = {},
 			description = "A basic iron sword.",
+			keywords = { "iron", "melee", "sword", "blade", "common" },
 		},
 		crimsonBlade = {
 			name = "Crimson Blade",
 			rarity = "mythic",
+			type = "melee",
+			tags = { "sword", "unique" },
 			baseStats = {
 				damage = 25,
 				critRate = 0.10,
@@ -42,6 +47,7 @@ local ItemData: ItemsList = {
 			passives = {},
 			abilities = {},
 			description = "A basic iron sword.",
+			keywords = { "crimson", "melee", "sword", "blade", "mythic" },
 		},
 	},
 
@@ -61,12 +67,12 @@ local ItemData: ItemsList = {
 	},
 
 	itemFrames = {
-		common = "rbxassetid://126419482158052",
-		rare = "rbxassetid://111734335113787",
-		epic = "rbxassetid://101898754856766",
-		legendary = "rbxassetid://108079644167723",
-		mythic = "rbxassetid://75615909782162",
-		secret = "rbxassetid://113901076644858",
+		common = "rbxassetid://107102273200611",
+		rare = "rbxassetid://125232445526828",
+		epic = "rbxassetid://90154252114083",
+		legendary = "rbxassetid://119592190921038",
+		mythic = "rbxassetid://91129267111260",
+		secret = "rbxassetid://89880526346253",
 	},
 	statNames = {
 		damage = "Damage",

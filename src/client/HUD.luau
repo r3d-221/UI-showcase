@@ -33,7 +33,6 @@ local HUD = {}
 local HUDScreen = PlayerGui:WaitForChild("HUD")
 local Screens = PlayerGui:WaitForChild("Screens")
 local map = Util.mapUI(HUDScreen)
-print(map)
 
 local currentButton: HUDButton? = nil
 

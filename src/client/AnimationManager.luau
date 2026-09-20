@@ -12,6 +12,7 @@ local STYLE = {
 	windowOpen = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
 	windowClose = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
 	slotPop = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	typewriter = Enum.EasingStyle.Linear,
 }
 
 -----------------------------------
@@ -109,7 +110,7 @@ function AnimationManager.staggerSectionsIn(sections: { CanvasGroup })
 	for index, section in ipairs(sections) do
 		section.GroupTransparency = 1
 
-		task.delay(index * 0.06, function()
+		task.delay(index * 0.045, function()
 			if section.Parent then
 				playTween(section, STYLE.fade, { GroupTransparency = 0 })
 			end
@@ -133,6 +134,35 @@ function AnimationManager.cancel(target: Instance)
 		active[target]:Cancel()
 		active[target] = nil
 	end
+end
+
+function AnimationManager.typewrite(textLabel: TextLabel, text: string, speedPerChar: number?)
+	if active[textLabel] then
+		active[textLabel]:Cancel()
+	end
+
+	textLabel.Text = text
+	textLabel.MaxVisibleGraphemes = 0
+
+	local length = utf8.len(text) or string.len(text)
+	if length == 0 then
+		return
+	end
+
+	local duration = length * (speedPerChar or 0.015)
+	local tweenInfo = TweenInfo.new(duration, STYLE.typewriter)
+
+	local tween = TweenService:Create(textLabel, tweenInfo, { MaxVisibleGraphemes = length })
+	active[textLabel] = tween
+
+	tween.Completed:Connect(function()
+		if active[textLabel] == tween then
+			active[textLabel] = nil
+			textLabel.MaxVisibleGraphemes = -1
+		end
+	end)
+
+	tween:Play()
 end
 
 return AnimationManager

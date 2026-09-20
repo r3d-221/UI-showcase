@@ -14,25 +14,34 @@ local PlayerManager = require(Client.PlayerManager)
 local UIManager = require(Client.UIManager)
 local AnimationManager = require(Client.AnimationManager)
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Shared = ReplicatedStorage:FindFirstChild("Shared")
 local ItemData = require(Shared.ItemData)
 local Types = require(Shared.Types)
 local Util = require(Shared.Util)
 local Signal = require(Shared.Signal)
 
 -- Templates
-local templates = ReplicatedStorage:WaitForChild("templates")
+local templates = ReplicatedStorage:FindFirstChild("templates")
 local slotTemplate = templates.slot_template
 local statTemplate = templates.stat_template
+local filterInfoTemplate = templates.filter_info_template
 
 -- Types
 type Item = Types.Item
 type Tab = "weapons" | "armors" | "materials"
 type InfoTab = "stats" | "passives" | "description"
+type FilterCategory = "rarity" | "type" | "tags"
+type FilterState = { [FilterCategory]: { [string]: boolean? } }
 
 -- Constants
 local TAB_KEYS: { Tab } = { "weapons", "armors", "materials" }
 local INFO_TAB_KEYS: { InfoTab } = { "stats", "passives", "description" }
+local FILTER_CATEGORIES: { FilterCategory } = { "rarity", "type", "tags" }
+local RARITY_ORDER = { "common", "rare", "epic", "legendary", "mythic", "secret" }
+local FILTER_DEFAULT_COLOR: Color3 = filterInfoTemplate.background.ImageColor3
+local FILTER_DEFAULT_TEXT_COLOR: Color3 = filterInfoTemplate.text.TextColor3
+local FILTER_DEFAULT_SELECTED_TEXT_COLOR = Color3.fromHex("1F2636")
+local BRIGHT_COLOR = Color3.fromRGB(0, 240, 255)
 
 -----------------------------------
 -- Module definition & state
@@ -45,17 +54,28 @@ local inventory = screen:FindFirstChild("inventory")
 local canvas = inventory:FindFirstChild("canvas")
 local map = Util.mapUI(canvas)
 
-print(map)
-
 local currentTab: Tab = "weapons"
 local currentItem: Item? = nil
 local currentSlotUI: Frame? = nil
 local dataConnection: (() -> ())? = nil
 
+local slotItemData = setmetatable({}, { __mode = "k" })
+
+local isFilterOpen = false
+local pendingFilters: FilterState = { rarity = {}, type = {}, tags = {} }
+local activeFilters: FilterState = { rarity = {}, type = {}, tags = {} }
+local filterSLots: { [FilterCategory]: { [string]: CanvasGroup } } = { rarity = {}, type = {}, tags = {} }
+
 -----------------------------------
 -- Helper functions
 -----------------------------------
 
+-- capitalizes the first character
+local function capitalize(text: string): string
+	return text:sub(1, 1):upper() .. text:sub(2)
+end
+
+-- sets the selected slot image for the currenlty inspected slot
 local function setSelectedSlot(newSlot: Frame?)
 	if currentSlotUI then
 		local prev = currentSlotUI:FindFirstChild("selected") :: ImageLabel?
@@ -75,6 +95,7 @@ local function setSelectedSlot(newSlot: Frame?)
 	end
 end
 
+-- changes the info tabs
 local function switchInfoTab(tabName: InfoTab)
 	for _, key in INFO_TAB_KEYS do
 		local isTarget = (key == tabName)
@@ -94,6 +115,7 @@ local function switchInfoTab(tabName: InfoTab)
 	end
 end
 
+-- changes the category tabs
 local function switchTab(newTab: Tab)
 	currentTab = newTab
 
@@ -108,7 +130,250 @@ local function switchTab(newTab: Tab)
 	Inventory.updateCurrentTab()
 end
 
-local function createStat(name: string, rank: string, text: string)
+local function checkSearch(itemData: any): boolean
+	return true
+end
+
+local function hasAnyFilters(filters: FilterState): boolean
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		if next(filters[category]) then
+			return true
+		end
+	end
+	return false
+end
+
+-- checks which filters are currently active
+local function checkActiveFilter(itemData: any): boolean
+	if not itemData then
+		return false
+	end
+
+	local rarityFilters = activeFilters["rarity" :: FilterCategory]
+	local typeFilters = activeFilters["type" :: FilterCategory]
+	local tagFilters = activeFilters["tags" :: FilterCategory]
+
+	-- if rarity is not selected then skips it, doesn't return false
+	-- only returns flase if both conditions true
+	-- the next() checks if the table is empty
+	if next(rarityFilters) and not rarityFilters[itemData.rarity] then
+		return false
+	end
+
+	if next(typeFilters) and not typeFilters[itemData.type] then
+		return false
+	end
+
+	if next(tagFilters) then
+		local matchedTag = false
+		for _, tag in itemData.tags or {} do
+			if tagFilters[tag] then
+				matchedTag = true
+				break
+			end
+		end
+		if not matchedTag then
+			return false
+		end
+	end
+
+	return true
+end
+
+-- changes the filter slots to selected if clicked
+local function toggleFilterSlot(slot: CanvasGroup, isSelected: boolean, selectedColor: Color3?)
+	local background = slot:FindFirstChild("background") :: ImageLabel?
+	local text = slot:FindFirstChild("text") :: TextLabel?
+
+	if background then
+		background.ImageColor3 = isSelected and (selectedColor or BRIGHT_COLOR) or FILTER_DEFAULT_COLOR
+	end
+	if text then
+		text.TextColor3 = isSelected and FILTER_DEFAULT_SELECTED_TEXT_COLOR or FILTER_DEFAULT_TEXT_COLOR
+	end
+end
+
+-- creates filter slots
+local function createFilterSlot(category: FilterCategory, value: string, name: string, parent: Instance)
+	local filterSlot = filterInfoTemplate:Clone()
+	filterSlot.Name = value
+
+	local text = filterSlot:FindFirstChild("text") :: TextLabel?
+	if text then
+		text.Text = name
+	end
+
+	toggleFilterSlot(filterSlot, pendingFilters[category][value] == true)
+
+	local button = filterSlot:FindFirstChild("button") :: TextButton?
+	if button then
+		button.MouseEnter:Connect(function()
+			AnimationManager.hover(filterSlot, true)
+		end)
+		button.MouseLeave:Connect(function()
+			AnimationManager.hover(filterSlot, false)
+		end)
+		button.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(filterSlot)
+
+			local isSelected = not pendingFilters[category][value]
+			pendingFilters[category][value] = isSelected or nil
+			toggleFilterSlot(filterSlot, isSelected)
+		end)
+	end
+
+	filterSlot.Parent = parent
+	filterSLots[category][value] = filterSlot
+	return filterSlot
+end
+
+-- alternative names for search
+local function searchKeys(): ({ string }, { string })
+	local typeSet = {}
+	local tagSet = {}
+
+	for _, name in TAB_KEYS do
+		local category = ItemData[name]
+		if category then
+			for _, itemData in pairs(category) do
+				if itemData.type then
+					typeSet[itemData.type] = true
+				end
+				if itemData.tags then
+					for _, tag in itemData.tags do
+						tagSet[tag] = true
+					end
+				end
+			end
+		end
+	end
+
+	local types = {}
+	local tags = {}
+	for name in pairs(typeSet) do
+		table.insert(types, name)
+	end
+	for name in pairs(tagSet) do
+		table.insert(tags, name)
+	end
+	table.sort(types)
+	table.sort(tags)
+
+	return types, tags
+end
+
+-- clears the filter slots
+local function clearFilterSLots(container: Instance)
+	for _, child in container:GetChildren() do
+		if child:IsA("CanvasGroup") then
+			child:Destroy()
+		end
+	end
+end
+
+-- updates the filter options based on the data
+local function updateFilterOptions()
+	clearFilterSLots(map.filter_rarity)
+	clearFilterSLots(map.filter_types)
+	clearFilterSLots(map.filter_tags_scroll)
+	filterSLots = { rarity = {}, type = {}, tags = {} }
+
+	for _, name in RARITY_ORDER do
+		createFilterSlot("rarity", name, capitalize(name), map.filter_rarity)
+	end
+
+	local typeOptions, tagOptions = searchKeys()
+
+	for _, name in typeOptions do
+		createFilterSlot("type", name, capitalize(name), map.filter_types)
+	end
+
+	for _, name in tagOptions do
+		createFilterSlot("tags", name, capitalize(name), map.filter_tags_scroll)
+	end
+end
+
+-- clears the pending filter list
+local function syncPendingFromActive()
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		local slots = filterSLots[category]
+		for value, slot in pairs(slots) do
+			local isSelected = activeFilters[category][value] == true
+			pendingFilters[category][value] = isSelected or nil
+
+			toggleFilterSlot(slot, isSelected)
+		end
+	end
+end
+
+-- creates a copy of the filter state
+local function copyFilterState(source: FilterState): FilterState
+	local copy: FilterState = { rarity = {}, type = {}, tags = {} }
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		for value in pairs(source[category]) do
+			copy[category][value] = true
+		end
+	end
+	return copy
+end
+
+-- opens the filter panel
+function Inventory.openFilterPanel()
+	if isFilterOpen then
+		return
+	end
+	isFilterOpen = true
+
+	syncPendingFromActive()
+
+	AnimationManager.windowOpen(map.filter_info, map.filter_info)
+	AnimationManager.windowOpen(map.filter_close, map.filter_close)
+end
+
+-- closes the filter panel
+function Inventory.closeFilterPanel()
+	if not isFilterOpen then
+		return
+	end
+	isFilterOpen = false
+
+	AnimationManager.windowClose(map.filter_info, map.filter_info)
+	AnimationManager.windowClose(map.filter_close, map.filter_close)
+end
+
+-- toggle for filter panel
+function Inventory.toggleFilterPanel()
+	if isFilterOpen then
+		Inventory.closeFilterPanel()
+	else
+		Inventory.openFilterPanel()
+	end
+end
+
+-- applies the pending filters
+function Inventory.applyPendingFilters()
+	activeFilters = copyFilterState(pendingFilters)
+	Inventory.refreshVisibility()
+	Inventory.closeFilterPanel()
+end
+
+-- resets the filter settings
+function Inventory.resetFilters()
+	pendingFilters = { rarity = {}, type = {}, tags = {} }
+	activeFilters = { rarity = {}, type = {}, tags = {} }
+
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		for value, filterSlot in pairs(filterSLots[category]) do
+			local accentColor = (category == "rarity") and ItemData.rarityColors[value] or nil
+			toggleFilterSlot(filterSlot, false, accentColor)
+		end
+	end
+
+	Inventory.refreshVisibility()
+end
+
+-- creates stats
+local function createStat(name: string, rank: string, text: string, delayIndex: number)
 	local statFrame = statTemplate:Clone()
 	statFrame.Name = name
 
@@ -117,19 +382,34 @@ local function createStat(name: string, rank: string, text: string)
 	local statName = statFrame:FindFirstChild("stat_name") :: TextLabel?
 
 	if statAmount then
-		statAmount.Text = text
+		statAmount.MaxVisibleGraphemes = 0
 	end
 	if statRank then
-		statRank.Text = rank
+		statRank.MaxVisibleGraphemes = 0
 	end
 	if statName then
-		statName.Text = name .. ":"
+		statName.MaxVisibleGraphemes = 0
 	end
 
 	statFrame.Parent = map.stats_info
+
+	task.delay(delayIndex * 0.08, function()
+		if statFrame.Parent then
+			if statName then
+				AnimationManager.typewrite(statName, name .. ":", 0.02)
+			end
+			if statRank then
+				AnimationManager.typewrite(statRank, rank, 0.02)
+			end
+			if statAmount then
+				AnimationManager.typewrite(statAmount, text, 0.02)
+			end
+		end
+	end)
 end
 
-local function createSlot(item: Item, parent: Instance?): Frame?
+-- creates inventory slots
+local function createInventorySlot(item: Item, parent: Instance?): Frame?
 	local category = ItemData[currentTab]
 	local itemData = category and category[item.id]
 	if not itemData then
@@ -169,6 +449,13 @@ local function createSlot(item: Item, parent: Instance?): Frame?
 	end
 
 	slot.Parent = parent or map.list
+
+	-- Only slots in the main grid (not the "item" preview slot in the info
+	-- panel) need to participate in filtering/search.
+	if not parent then
+		slotItemData[slot] = itemData
+	end
+
 	return slot
 end
 
@@ -185,6 +472,12 @@ local function setUpButtons()
 		AnimationManager.popOut(map.close)
 
 		AnimationManager.windowClose(inventory, canvas)
+
+		if isFilterOpen then
+			isFilterOpen = false
+			map.filter_info.Visible = false
+			map.filter_close.Visible = false
+		end
 
 		UIManager.closeAll()
 		Inventory.clearSlots()
@@ -230,11 +523,77 @@ local function setUpButtons()
 			end)
 		end
 	end
+
+	local filterButton = map.filter:FindFirstChild("button") :: TextButton?
+	if filterButton then
+		filterButton.MouseEnter:Connect(function()
+			AnimationManager.hover(map.filter, true)
+		end)
+		filterButton.MouseLeave:Connect(function()
+			AnimationManager.hover(map.filter, false)
+		end)
+		filterButton.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(map.filter)
+			Inventory.toggleFilterPanel()
+		end)
+	end
+
+	local filterCloseButton = map.filter_close:FindFirstChild("button") :: TextButton?
+	if filterCloseButton then
+		filterCloseButton.MouseEnter:Connect(function()
+			AnimationManager.hover(map.filter_close, true)
+		end)
+		filterCloseButton.MouseLeave:Connect(function()
+			AnimationManager.hover(map.filter_close, false)
+		end)
+		filterCloseButton.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(map.filter_close)
+			Inventory.closeFilterPanel()
+		end)
+	end
+
+	local applyButton = map.filter_apply:FindFirstChild("button") :: TextButton?
+	if applyButton then
+		applyButton.MouseEnter:Connect(function()
+			AnimationManager.hover(map.filter_apply, true)
+		end)
+		applyButton.MouseLeave:Connect(function()
+			AnimationManager.hover(map.filter_apply, false)
+		end)
+		applyButton.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(map.filter_apply)
+			Inventory.applyPendingFilters()
+		end)
+	end
+
+	local resetButton = map.filter_reset:FindFirstChild("button") :: TextButton?
+	if resetButton then
+		resetButton.MouseEnter:Connect(function()
+			AnimationManager.hover(map.filter_reset, true)
+		end)
+		resetButton.MouseLeave:Connect(function()
+			AnimationManager.hover(map.filter_reset, false)
+		end)
+		resetButton.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(map.filter_reset)
+			Inventory.resetFilters()
+		end)
+	end
 end
 
 -----------------------------------
 -- Public functions
 -----------------------------------
+
+-- sets the visibility of the inventory slots based on the filters
+function Inventory.refreshVisibility()
+	for _, slot in map.list:GetChildren() do
+		if slot:IsA("Frame") then
+			local itemData = slotItemData[slot]
+			slot.Visible = (itemData ~= nil) and checkActiveFilter(itemData) and checkSearch(itemData)
+		end
+	end
+end
 
 function Inventory.clearSlots()
 	setSelectedSlot(nil)
@@ -306,12 +665,14 @@ function Inventory.updateSlots(items)
 
 	local index = 0
 	for _, item in tabItems do
-		local slot = createSlot(item)
+		local slot = createInventorySlot(item)
 		if slot then
 			index += 1
 			AnimationManager.staggerPopIn(slot, index)
 		end
 	end
+
+	Inventory.refreshVisibility()
 end
 
 function Inventory.updateCurrentTab()
@@ -331,16 +692,18 @@ function Inventory.updateStats()
 
 	local itemStats = item.stats :: { [string]: Types.Roll }
 
+	local index = 0
 	for _, name in ipairs(ItemData.statOrder) do
 		local stat = itemStats[name]
 
 		if stat then
+			index += 1
 			local isPercent = ItemData.statTypes[name] == "percent"
 			local displayValue = if isPercent
 				then string.format("%.1f%%", stat.value * 100)
 				else tostring(math.round(stat.value))
 
-			createStat(ItemData.statNames[name], stat.rank, displayValue)
+			createStat(ItemData.statNames[name], stat.rank, displayValue, index)
 		end
 	end
 end
@@ -359,7 +722,7 @@ function Inventory.updateInfo()
 
 	Inventory.toggleInfo(false)
 
-	local slot = createSlot(item, map.item)
+	local slot = createInventorySlot(item, map.item)
 	if slot then
 		local button = slot:FindFirstChild("button")
 		if button then
@@ -390,13 +753,14 @@ function Inventory.updateInfo()
 	map.description.Visible = true
 
 	map.title.Visible = true
-	map.title.text.Text = itemData.name
+	AnimationManager.typewrite(map.title.text, itemData.name, 0.03)
 
 	switchInfoTab(if hasStats then "stats" else "description")
 end
 
 function Inventory.onStart()
 	setUpButtons()
+	updateFilterOptions()
 
 	dataConnection = PlayerManager.onChange(function(data)
 		if data and data.items then
