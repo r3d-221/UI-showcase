@@ -42,7 +42,8 @@ local FILTER_DEFAULT_COLOR: Color3 = filterInfoTemplate.background.ImageColor3
 local FILTER_DEFAULT_TEXT_COLOR: Color3 = filterInfoTemplate.text.TextColor3
 local FILTER_DEFAULT_SELECTED_TEXT_COLOR = Color3.fromHex("1F2636")
 local BRIGHT_COLOR = Color3.fromRGB(0, 240, 255)
-
+local SEARCH_DEBOUNCE_SECONDS = 0.15
+local SEARCH_FUZZY_EDIT_DISTANCE = 2
 -----------------------------------
 -- Module definition & state
 -----------------------------------
@@ -65,6 +66,10 @@ local isFilterOpen = false
 local pendingFilters: FilterState = { rarity = {}, type = {}, tags = {} }
 local activeFilters: FilterState = { rarity = {}, type = {}, tags = {} }
 local filterSLots: { [FilterCategory]: { [string]: CanvasGroup } } = { rarity = {}, type = {}, tags = {} }
+
+local currentSearchQuery = ""
+local searchDebounceToken = 0
+local searchKeyCache: { [any]: string } = {}
 
 -----------------------------------
 -- Helper functions
@@ -130,103 +135,6 @@ local function switchTab(newTab: Tab)
 	Inventory.updateCurrentTab()
 end
 
-local function checkSearch(itemData: any): boolean
-	return true
-end
-
-local function hasAnyFilters(filters: FilterState): boolean
-	for _, category: FilterCategory in FILTER_CATEGORIES do
-		if next(filters[category]) then
-			return true
-		end
-	end
-	return false
-end
-
--- checks which filters are currently active
-local function checkActiveFilter(itemData: any): boolean
-	if not itemData then
-		return false
-	end
-
-	local rarityFilters = activeFilters["rarity" :: FilterCategory]
-	local typeFilters = activeFilters["type" :: FilterCategory]
-	local tagFilters = activeFilters["tags" :: FilterCategory]
-
-	-- if rarity is not selected then skips it, doesn't return false
-	-- only returns flase if both conditions true
-	-- the next() checks if the table is empty
-	if next(rarityFilters) and not rarityFilters[itemData.rarity] then
-		return false
-	end
-
-	if next(typeFilters) and not typeFilters[itemData.type] then
-		return false
-	end
-
-	if next(tagFilters) then
-		local matchedTag = false
-		for _, tag in itemData.tags or {} do
-			if tagFilters[tag] then
-				matchedTag = true
-				break
-			end
-		end
-		if not matchedTag then
-			return false
-		end
-	end
-
-	return true
-end
-
--- changes the filter slots to selected if clicked
-local function toggleFilterSlot(slot: CanvasGroup, isSelected: boolean, selectedColor: Color3?)
-	local background = slot:FindFirstChild("background") :: ImageLabel?
-	local text = slot:FindFirstChild("text") :: TextLabel?
-
-	if background then
-		background.ImageColor3 = isSelected and (selectedColor or BRIGHT_COLOR) or FILTER_DEFAULT_COLOR
-	end
-	if text then
-		text.TextColor3 = isSelected and FILTER_DEFAULT_SELECTED_TEXT_COLOR or FILTER_DEFAULT_TEXT_COLOR
-	end
-end
-
--- creates filter slots
-local function createFilterSlot(category: FilterCategory, value: string, name: string, parent: Instance)
-	local filterSlot = filterInfoTemplate:Clone()
-	filterSlot.Name = value
-
-	local text = filterSlot:FindFirstChild("text") :: TextLabel?
-	if text then
-		text.Text = name
-	end
-
-	toggleFilterSlot(filterSlot, pendingFilters[category][value] == true)
-
-	local button = filterSlot:FindFirstChild("button") :: TextButton?
-	if button then
-		button.MouseEnter:Connect(function()
-			AnimationManager.hover(filterSlot, true)
-		end)
-		button.MouseLeave:Connect(function()
-			AnimationManager.hover(filterSlot, false)
-		end)
-		button.MouseButton1Click:Connect(function()
-			AnimationManager.popOut(filterSlot)
-
-			local isSelected = not pendingFilters[category][value]
-			pendingFilters[category][value] = isSelected or nil
-			toggleFilterSlot(filterSlot, isSelected)
-		end)
-	end
-
-	filterSlot.Parent = parent
-	filterSLots[category][value] = filterSlot
-	return filterSlot
-end
-
 -- alternative names for search
 local function searchKeys(): ({ string }, { string })
 	local typeSet = {}
@@ -260,116 +168,6 @@ local function searchKeys(): ({ string }, { string })
 	table.sort(tags)
 
 	return types, tags
-end
-
--- clears the filter slots
-local function clearFilterSLots(container: Instance)
-	for _, child in container:GetChildren() do
-		if child:IsA("CanvasGroup") then
-			child:Destroy()
-		end
-	end
-end
-
--- updates the filter options based on the data
-local function updateFilterOptions()
-	clearFilterSLots(map.filter_rarity)
-	clearFilterSLots(map.filter_types)
-	clearFilterSLots(map.filter_tags_scroll)
-	filterSLots = { rarity = {}, type = {}, tags = {} }
-
-	for _, name in RARITY_ORDER do
-		createFilterSlot("rarity", name, capitalize(name), map.filter_rarity)
-	end
-
-	local typeOptions, tagOptions = searchKeys()
-
-	for _, name in typeOptions do
-		createFilterSlot("type", name, capitalize(name), map.filter_types)
-	end
-
-	for _, name in tagOptions do
-		createFilterSlot("tags", name, capitalize(name), map.filter_tags_scroll)
-	end
-end
-
--- clears the pending filter list
-local function syncPendingFromActive()
-	for _, category: FilterCategory in FILTER_CATEGORIES do
-		local slots = filterSLots[category]
-		for value, slot in pairs(slots) do
-			local isSelected = activeFilters[category][value] == true
-			pendingFilters[category][value] = isSelected or nil
-
-			toggleFilterSlot(slot, isSelected)
-		end
-	end
-end
-
--- creates a copy of the filter state
-local function copyFilterState(source: FilterState): FilterState
-	local copy: FilterState = { rarity = {}, type = {}, tags = {} }
-	for _, category: FilterCategory in FILTER_CATEGORIES do
-		for value in pairs(source[category]) do
-			copy[category][value] = true
-		end
-	end
-	return copy
-end
-
--- opens the filter panel
-function Inventory.openFilterPanel()
-	if isFilterOpen then
-		return
-	end
-	isFilterOpen = true
-
-	syncPendingFromActive()
-
-	AnimationManager.windowOpen(map.filter_info, map.filter_info)
-	AnimationManager.windowOpen(map.filter_close, map.filter_close)
-end
-
--- closes the filter panel
-function Inventory.closeFilterPanel()
-	if not isFilterOpen then
-		return
-	end
-	isFilterOpen = false
-
-	AnimationManager.windowClose(map.filter_info, map.filter_info)
-	AnimationManager.windowClose(map.filter_close, map.filter_close)
-end
-
--- toggle for filter panel
-function Inventory.toggleFilterPanel()
-	if isFilterOpen then
-		Inventory.closeFilterPanel()
-	else
-		Inventory.openFilterPanel()
-	end
-end
-
--- applies the pending filters
-function Inventory.applyPendingFilters()
-	activeFilters = copyFilterState(pendingFilters)
-	Inventory.refreshVisibility()
-	Inventory.closeFilterPanel()
-end
-
--- resets the filter settings
-function Inventory.resetFilters()
-	pendingFilters = { rarity = {}, type = {}, tags = {} }
-	activeFilters = { rarity = {}, type = {}, tags = {} }
-
-	for _, category: FilterCategory in FILTER_CATEGORIES do
-		for value, filterSlot in pairs(filterSLots[category]) do
-			local accentColor = (category == "rarity") and ItemData.rarityColors[value] or nil
-			toggleFilterSlot(filterSlot, false, accentColor)
-		end
-	end
-
-	Inventory.refreshVisibility()
 end
 
 -- creates stats
@@ -579,6 +377,335 @@ local function setUpButtons()
 			Inventory.resetFilters()
 		end)
 	end
+
+	local searchBox = map.search_text :: TextBox
+	searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		searchDebounceToken += 1
+		local requestToken = searchDebounceToken
+
+		task.delay(SEARCH_DEBOUNCE_SECONDS, function()
+			if requestToken ~= searchDebounceToken then
+				return
+			end
+			currentSearchQuery = searchBox.Text:lower()
+			Inventory.refreshVisibility()
+		end)
+	end)
+end
+
+-----------------------------------
+-- Filter
+-----------------------------------
+
+-- checks which filters are currently active
+local function checkActiveFilter(itemData: any): boolean
+	if not itemData then
+		return false
+	end
+
+	local rarityFilters = activeFilters["rarity" :: FilterCategory]
+	local typeFilters = activeFilters["type" :: FilterCategory]
+	local tagFilters = activeFilters["tags" :: FilterCategory]
+
+	-- if rarity is not selected then skips it, doesn't return false
+	-- only returns flase if both conditions true
+	-- the next() checks if the table is empty
+	if next(rarityFilters) and not rarityFilters[itemData.rarity] then
+		return false
+	end
+
+	if next(typeFilters) and not typeFilters[itemData.type] then
+		return false
+	end
+
+	if next(tagFilters) then
+		local matchedTag = false
+		for _, tag in itemData.tags or {} do
+			if tagFilters[tag] then
+				matchedTag = true
+				break
+			end
+		end
+		if not matchedTag then
+			return false
+		end
+	end
+
+	return true
+end
+
+-- changes the filter slots to selected if clicked
+local function toggleFilterSlot(slot: CanvasGroup, isSelected: boolean, selectedColor: Color3?)
+	local background = slot:FindFirstChild("background") :: ImageLabel?
+	local text = slot:FindFirstChild("text") :: TextLabel?
+
+	if background then
+		background.ImageColor3 = isSelected and (selectedColor or BRIGHT_COLOR) or FILTER_DEFAULT_COLOR
+	end
+	if text then
+		text.TextColor3 = isSelected and FILTER_DEFAULT_SELECTED_TEXT_COLOR or FILTER_DEFAULT_TEXT_COLOR
+	end
+end
+
+-- creates filter slots
+local function createFilterSlot(category: FilterCategory, value: string, name: string, parent: Instance)
+	local filterSlot = filterInfoTemplate:Clone()
+	filterSlot.Name = value
+
+	local text = filterSlot:FindFirstChild("text") :: TextLabel?
+	if text then
+		text.Text = name
+	end
+
+	toggleFilterSlot(filterSlot, pendingFilters[category][value] == true)
+
+	local button = filterSlot:FindFirstChild("button") :: TextButton?
+	if button then
+		button.MouseEnter:Connect(function()
+			AnimationManager.hover(filterSlot, true)
+		end)
+		button.MouseLeave:Connect(function()
+			AnimationManager.hover(filterSlot, false)
+		end)
+		button.MouseButton1Click:Connect(function()
+			AnimationManager.popOut(filterSlot)
+
+			local isSelected = not pendingFilters[category][value]
+			pendingFilters[category][value] = isSelected or nil
+			toggleFilterSlot(filterSlot, isSelected)
+		end)
+	end
+
+	filterSlot.Parent = parent
+	filterSLots[category][value] = filterSlot
+	return filterSlot
+end
+
+-- clears the filter slots
+local function clearFilterSLots(container: Instance)
+	for _, child in container:GetChildren() do
+		if child:IsA("CanvasGroup") then
+			child:Destroy()
+		end
+	end
+end
+
+-- updates the filter options based on the data
+local function updateFilterOptions()
+	clearFilterSLots(map.filter_rarity)
+	clearFilterSLots(map.filter_types)
+	clearFilterSLots(map.filter_tags_scroll)
+	filterSLots = { rarity = {}, type = {}, tags = {} }
+
+	for _, name in RARITY_ORDER do
+		createFilterSlot("rarity", name, capitalize(name), map.filter_rarity)
+	end
+
+	local typeOptions, tagOptions = searchKeys()
+
+	for _, name in typeOptions do
+		createFilterSlot("type", name, capitalize(name), map.filter_types)
+	end
+
+	for _, name in tagOptions do
+		createFilterSlot("tags", name, capitalize(name), map.filter_tags_scroll)
+	end
+end
+
+-- clears the pending filter list
+local function syncPendingFromActive()
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		local slots = filterSLots[category]
+		for value, slot in pairs(slots) do
+			local isSelected = activeFilters[category][value] == true
+			pendingFilters[category][value] = isSelected or nil
+
+			toggleFilterSlot(slot, isSelected)
+		end
+	end
+end
+
+-- creates a copy of the filter state
+local function copyFilterState(source: FilterState): FilterState
+	local copy: FilterState = { rarity = {}, type = {}, tags = {} }
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		for value in pairs(source[category]) do
+			copy[category][value] = true
+		end
+	end
+	return copy
+end
+
+-- opens the filter panel
+function Inventory.openFilterPanel()
+	if isFilterOpen then
+		return
+	end
+	isFilterOpen = true
+
+	syncPendingFromActive()
+
+	AnimationManager.windowOpen(map.filter_info, map.filter_info)
+	AnimationManager.windowOpen(map.filter_close, map.filter_close)
+end
+
+-- closes the filter panel
+function Inventory.closeFilterPanel()
+	if not isFilterOpen then
+		return
+	end
+	isFilterOpen = false
+
+	AnimationManager.windowClose(map.filter_info, map.filter_info)
+	AnimationManager.windowClose(map.filter_close, map.filter_close)
+end
+
+-- toggle for filter panel
+function Inventory.toggleFilterPanel()
+	if isFilterOpen then
+		Inventory.closeFilterPanel()
+	else
+		Inventory.openFilterPanel()
+	end
+end
+
+-- applies the pending filters
+function Inventory.applyPendingFilters()
+	activeFilters = copyFilterState(pendingFilters)
+	Inventory.refreshVisibility()
+	Inventory.closeFilterPanel()
+end
+
+-- resets the filter settings
+function Inventory.resetFilters()
+	pendingFilters = { rarity = {}, type = {}, tags = {} }
+	activeFilters = { rarity = {}, type = {}, tags = {} }
+
+	for _, category: FilterCategory in FILTER_CATEGORIES do
+		for value, filterSlot in pairs(filterSLots[category]) do
+			local accentColor = (category == "rarity") and ItemData.rarityColors[value] or nil
+			toggleFilterSlot(filterSlot, false, accentColor)
+		end
+	end
+
+	Inventory.refreshVisibility()
+end
+
+-----------------------------------
+-- Search
+-----------------------------------
+
+-- Wagner–Fischer
+-- changes string a to string b if they are close
+local function editDistance(a: string, b: string): number
+	local lengthA, lengthB = #a, #b
+	if lengthA == 0 then
+		return lengthB
+	end
+	if lengthB == 0 then
+		return lengthA
+	end
+
+	-- O(n) space complexity
+	-- uses two 1D arrays instead of the whole matrix
+	local previousRow: { number } = table.create(lengthB + 1, 0)
+	local currentRow: { number } = table.create(lengthB + 1, 0)
+
+	-- add to the table
+	for j = 0, lengthB do
+		previousRow[j + 1] = j
+	end
+
+	-- remove data from previous row and add it to the next row
+	for i = 1, lengthA do
+		currentRow[1] = i
+		local charA = string.byte(a, i)
+
+		for j = 1, lengthB do
+			local charB = string.byte(b, j)
+			local cost = (charA == charB) and 0 or 1
+
+			local deletion = previousRow[j + 1] + 1
+			local insertion = currentRow[j] + 1
+			local substitution = previousRow[j] + cost
+
+			currentRow[j + 1] = math.min(deletion, insertion, substitution)
+		end
+
+		-- swap rows
+		previousRow, currentRow = currentRow, previousRow
+	end
+
+	return previousRow[lengthB + 1]
+end
+
+-- looks for if the input string is a close match
+local function isCloseMatch(query: string, word: string): boolean
+	if #query == 0 or #word == 0 then
+		return false
+	end
+
+	if string.find(word, query, 1, true) then
+		return true
+	end
+
+	local maxDistance = (#query <= 4) and 1 or SEARCH_FUZZY_EDIT_DISTANCE
+	return editDistance(query, word) <= maxDistance
+end
+
+-- gets the search key of an item from the item data
+local function getItemSearchKey(itemData: any): string
+	local cached = searchKeyCache[itemData]
+	if cached then
+		return cached
+	end
+
+	local parts: { string } = { tostring(itemData.name or "") }
+
+	local keywords = itemData.keywords :: { string }?
+	if keywords then
+		for _, keyword in keywords do
+			table.insert(parts, tostring(keyword))
+		end
+	end
+
+	local key = table.concat(parts, " "):lower()
+	searchKeyCache[itemData] = key
+	return key
+end
+
+local function matchesSearchQuery(itemData: any, query: string): boolean
+	if query == "" then
+		return true
+	end
+
+	local searchKey = getItemSearchKey(itemData)
+
+	if string.find(searchKey, query, 1, true) then
+		return true
+	end
+
+	-- checks for typos and has leeway
+	for queryWord in string.gmatch(query, "%S+") do
+		local foundMatch = false
+
+		for itemWord in string.gmatch(searchKey, "%S+") do
+			if isCloseMatch(queryWord, itemWord) then
+				foundMatch = true
+				break
+			end
+		end
+
+		if not foundMatch then
+			return false
+		end
+	end
+
+	return true
+end
+
+local function checkSearch(itemData: any): boolean
+	return matchesSearchQuery(itemData, currentSearchQuery)
 end
 
 -----------------------------------
@@ -595,6 +722,7 @@ function Inventory.refreshVisibility()
 	end
 end
 
+-- destroys all inventory slots
 function Inventory.clearSlots()
 	setSelectedSlot(nil)
 	for _, child in map.list:GetChildren() do
@@ -605,6 +733,7 @@ function Inventory.clearSlots()
 	end
 end
 
+-- destroys all stats
 function Inventory.clearStats()
 	for _, child in map.stats_info:GetChildren() do
 		if child:IsA("Frame") then
@@ -613,6 +742,7 @@ function Inventory.clearStats()
 	end
 end
 
+-- toggle for info panel
 function Inventory.toggleInfo(isVisible: boolean)
 	if map.info:IsA("CanvasGroup") then
 		AnimationManager.fade(map.info, isVisible)
@@ -631,6 +761,7 @@ function Inventory.toggleInfo(isVisible: boolean)
 	end
 end
 
+-- closes the info panel
 function Inventory.closeInfo()
 	setSelectedSlot(nil)
 	currentItem = nil
@@ -640,6 +771,7 @@ function Inventory.closeInfo()
 	end
 end
 
+-- sets animations for the panels
 function Inventory.playSectionFades()
 	local sectionsToFade = {}
 
@@ -655,6 +787,7 @@ function Inventory.playSectionFades()
 	AnimationManager.staggerSectionsIn(sectionsToFade)
 end
 
+-- updates the inventory slots
 function Inventory.updateSlots(items)
 	Inventory.clearSlots()
 
@@ -675,6 +808,7 @@ function Inventory.updateSlots(items)
 	Inventory.refreshVisibility()
 end
 
+-- updates the current tab
 function Inventory.updateCurrentTab()
 	local data = PlayerManager.getData()
 	if data and data.items then
