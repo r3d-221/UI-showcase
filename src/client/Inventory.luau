@@ -44,6 +44,7 @@ local FILTER_DEFAULT_SELECTED_TEXT_COLOR = Color3.fromHex("1F2636")
 local BRIGHT_COLOR = Color3.fromRGB(0, 240, 255)
 local SEARCH_DEBOUNCE_SECONDS = 0.15
 local SEARCH_FUZZY_EDIT_DISTANCE = 2
+
 -----------------------------------
 -- Module definition & state
 -----------------------------------
