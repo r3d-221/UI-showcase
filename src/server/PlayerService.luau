@@ -3,15 +3,19 @@
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 -- Dependencies
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local SyncData = Remotes:WaitForChild("SyncData") :: RemoteEvent
 
+local StatsService = require(ServerScriptService.Server.StatsService)
 local Types = require(ReplicatedStorage.Shared.Types)
 
 -- Types
 type Item = Types.Item
+type PlayerData = Types.PlayerData
+type Cateogry = Types.Cateogry
 
 -----------------------------------
 -- Module definition & state
@@ -23,14 +27,30 @@ local playerData = {}
 -- Helper functions
 -----------------------------------
 
-local function defaultData()
-	return {
+local function defaultData(): PlayerData
+	local data: PlayerData = {
 		items = {
 			weapons = {},
 			armors = {},
 			materials = {},
 		},
+		baseStats = {},
+		changedStats = {},
+		equipped = {
+			weapons = nil,
+			armors = {
+				head = nil,
+				torso = nil,
+				legs = nil,
+				feet = nil,
+			},
+		},
+		tempBuffs = {},
 	}
+
+	StatsService.recalculate(data)
+
+	return data
 end
 
 local function setUpData(player: Player)
@@ -69,24 +89,21 @@ function PlayerService.getData(player: Player)
 	return data
 end
 
-function PlayerService.addItem(player: Player, item: Item, category: string)
+function PlayerService.addItem(player: Player, item: Item, category: Cateogry)
 	local data = PlayerService.getData(player)
 	if not data then
 		return
 	end
 
-	if category == "materials" then
-		-- material stack
-		table.insert(data.items.materials, item)
-		SyncData:FireClient(player, data)
-	else
-		local categoryList = data.items[category]
-		if categoryList then
+	local categoryList = data.items[category]
+	if categoryList then
+		if category ~= "materials" then
 			table.insert(categoryList, item)
 			SyncData:FireClient(player, data)
-		else
-			warn(string.format("[PlayerService] Attempted to add item to invalid category: '%s'", tostring(category)))
 		end
+		-- the materials will stack
+	else
+		warn(string.format("[PlayerService] Attempted to add item to invalid category: '%s'", tostring(category)))
 	end
 end
 

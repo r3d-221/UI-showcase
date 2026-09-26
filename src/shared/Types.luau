@@ -6,12 +6,15 @@ export type Roll = {
 	rank: string,
 }
 
+export type Cateogry = "weapons" | "armors" | "materials"
 export type WeaponStatName = "damage" | "critRate" | "critDamage" | "luck" | "attackSpeed" | "cooldownReduction"
 export type ArmorStatName = "armor" | "health" | "luck" | "speed"
 export type RarityName = "common" | "rare" | "epic" | "legendary" | "mythic" | "secret"
 export type ItemTags = "sword" | "spear" | "axe" | "greatSword" | "bow" | "crossBow" | "mechanicalBow" | "unique"
 export type ItemTypes = "melee" | "range"
+export type HitboxType = "arc" | "sphere" | "raycast" | "cylinder"
 
+export type StatNames = WeaponStatName | ArmorStatName
 export type WeaponStats = { [WeaponStatName]: Roll }
 export type ArmorStats = { [ArmorStatName]: Roll }
 
@@ -48,6 +51,15 @@ export type Item = {
 	stats: Stats?,
 }
 
+export type Hitbox = {
+	type: HitboxType,
+	range: number?,
+	radius: number?,
+	angle: number?,
+	height: number?,
+	distance: number?,
+}
+
 export type WeaponInfo = {
 	name: string,
 	rarity: RarityName,
@@ -55,9 +67,52 @@ export type WeaponInfo = {
 	passives: { [string]: any },
 	abilities: { [string]: any },
 	description: string,
-	keywords: { [string]: any },
+	keywords: { string },
+	hitbox: Hitbox,
+	windUp: number,
+	active: number,
+	recovery: number,
 	type: ItemTypes,
 	tags: { ItemTags },
+}
+
+export type Entity = {
+	model: Model,
+	humanoid: Humanoid,
+	rootPart: BasePart,
+	getStat: (self: Entity, stat: string) -> number,
+}
+
+export type Buff = {
+	stat: StatNames,
+	percent: number,
+}
+
+export type PlayerData = {
+	items: { [Cateogry]: { any } },
+	baseStats: { [StatNames]: number },
+	changedStats: { [StatNames]: number },
+	equipped: {
+		weapons: string?,
+		armors: {
+			head: string?,
+			torso: string?,
+			legs: string?,
+			feet: string?,
+		},
+	},
+	tempBuffs: { Buff },
+}
+
+export type DamageContext = {
+	attackerStats: { [string]: number },
+	targetStats: { [string]: number },
+	damageMultiplier: number,
+}
+
+export type DamageResult = {
+	amount: number,
+	isCrit: boolean,
 }
 
 export type RarityMap = { [RarityName]: number }

@@ -28,7 +28,7 @@ local filterInfoTemplate = templates.filter_info_template
 
 -- Types
 type Item = Types.Item
-type Tab = "weapons" | "armors" | "materials"
+type Tab = Types.Cateogry
 type InfoTab = "stats" | "passives" | "description"
 type FilterCategory = "rarity" | "type" | "tags"
 type FilterState = { [FilterCategory]: { [string]: boolean? } }

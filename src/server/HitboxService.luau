@@ -2,6 +2,10 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
+-----------------------------------
+-- Module definition & state
+-----------------------------------
+
 local HitboxService = {}
 
 -----------------------------------

@@ -1,14 +1,18 @@
 --!strict
+
+-- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- Dependencies
 local Types = require(ReplicatedStorage.Shared.Types)
 
+-- Types
 type WeaponData = Types.WeaponDataMap
 type Rarity = Types.RarityMap
 type RarityName = Types.RarityName
 
 type ItemsList = {
-	weapons: { WeaponData },
+	weapons: WeaponData,
 	rarity: Rarity,
 	itemFrames: { [RarityName]: string },
 	rarityColors: {},
@@ -17,6 +21,10 @@ type ItemsList = {
 	statTypes: { [string]: string },
 }
 
+-----------------------------------
+-- Module definition & state
+-----------------------------------
+
 local ItemData: ItemsList = {
 	weapons = {
 		ironSword = {
@@ -24,11 +32,11 @@ local ItemData: ItemsList = {
 			rarity = "common",
 			type = "melee",
 			tags = { "sword" },
-			baseStats = {
-				damage = 10,
-				critRate = 0,
-				critDamage = 1.1,
-			},
+			baseStats = { damage = 10, critRate = 0, critDamage = 1.1, attackSpeed = 0.2 },
+			hitbox = { type = "arc", range = 8, angle = 70 },
+			windUp = 0.2,
+			active = 0.15,
+			recovery = 0.35,
 			passives = {},
 			abilities = {},
 			description = "A basic iron sword.",
@@ -39,11 +47,11 @@ local ItemData: ItemsList = {
 			rarity = "mythic",
 			type = "melee",
 			tags = { "sword", "unique" },
-			baseStats = {
-				damage = 25,
-				critRate = 0.10,
-				critDamage = 1.6,
-			},
+			baseStats = { damage = 25, critRate = 0.10, critDamage = 1.6, attackSpeed = 0.4 },
+			hitbox = { type = "arc", range = 10, angle = 90 },
+			windUp = 0.18,
+			active = 0.15,
+			recovery = 0.3,
 			passives = {},
 			abilities = {},
 			description = "A basic iron sword.",
@@ -84,12 +92,14 @@ local ItemData: ItemsList = {
 		"damage",
 		"critRate",
 		"critDamage",
+		"attackSpeed",
 	},
 
 	statTypes = {
 		damage = "flat",
 		critRate = "percent",
 		critDamage = "percent",
+		attackSpeed = "percent",
 	},
 }
 

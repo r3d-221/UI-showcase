@@ -18,6 +18,7 @@ local Util = require(Shared.Util)
 -- Types
 type Stats = Types.Stats
 type Item = Types.Item
+type Cateogry = Types.Cateogry
 
 -- Constants
 local GENERATOR_TAG = "Generator"
@@ -100,7 +101,7 @@ end
 -- Public functions
 -----------------------------------
 
-function ItemService.giveItem(player: Player, id: string, category: string, amount: number?)
+function ItemService.giveItem(player: Player, id: string, category: Cateogry, amount: number?)
 	local item = createItem(id, category, amount)
 	if item then
 		PlayerService.addItem(player, item, category)
@@ -117,7 +118,7 @@ function ItemService.onStart()
 		if prompt and id and category then
 			prompt.Triggered:Connect(function(player: Player)
 				if category.Value ~= "materials" then
-					ItemService.giveItem(player, id.Value, category.Value)
+					ItemService.giveItem(player, id.Value, category.Value :: Cateogry)
 					print(string.format("[ItemService] %s obtained %s", player.Name, id.Value))
 				end
 			end)

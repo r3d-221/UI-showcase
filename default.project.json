@@ -1,5 +1,5 @@
 {
-  "name": "UI showcase",
+  "name": "System demo",
   "tree": {
     "$className": "DataModel",
 
@@ -24,9 +24,6 @@
     "ServerScriptService": {
       "Server": {
         "$path": "src/server"
-      },
-      "ServerPackages": {
-        "$path": "ServerPackages"
       }
     },
 
